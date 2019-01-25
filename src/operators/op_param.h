@@ -32,6 +32,10 @@ limitations under the License. */
 #include "fpga/V2/api.h"
 #endif
 
+#ifdef PADDLE_MOBILE_FPGA_KD
+#include "fpga-kd/api.h"
+#endif
+
 #ifdef PADDLE_MOBILE_CL
 #include "framework/cl/cl_image.h"
 #endif
@@ -912,6 +916,21 @@ class PriorBoxParam : public OpParam {
     return min_max_aspect_ratios_order_;
   }
 
+#ifdef PADDLE_MOBILE_FPGA
+  void *get_cache_boxes() const { return cache_boxes_; }
+  void *get_cache_variances() const { return cache_variances_; }
+
+  void make_cache(const int box_size, const int variance_size) {
+    cache_boxes_ = fpga::fpga_malloc(box_size);
+    cache_variances_ = fpga::fpga_malloc(variance_size);
+  };
+
+  // void set_cache(void* cache_boxes, void* cache_variances) {
+  //   cache_boxes_ = cache_boxes;
+  //   cache_variances_ = cache_variances;
+  // }
+#endif
+
  private:
   RType *input_;
   RType *input_image_;
@@ -927,6 +946,11 @@ class PriorBoxParam : public OpParam {
   float step_h_;
   float offset_;
   bool min_max_aspect_ratios_order_;
+
+#ifdef PADDLE_MOBILE_FPGA
+  void *cache_boxes_ = nullptr;
+  void *cache_variances_ = nullptr;
+#endif
 };
 #endif
 

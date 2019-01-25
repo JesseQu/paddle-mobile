@@ -61,7 +61,7 @@ float find_max(const float *input, const int num_classes) {
 }
 
 template <>
-void SoftmaxFuntor<CPU, float>::operator()(const framework::Tensor *X,
+void SoftmaxFuntor<float>::operator()(const framework::Tensor *X,
                                            framework::Tensor *Y) {
   const framework::DDim &dims = X->dims();
   int batch_size = dims[0];

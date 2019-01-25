@@ -66,6 +66,7 @@ class OperatorBase {
   void Run();
   std::vector<string> GetOutKeys() const;
   std::vector<string> GetInputKeys() const;
+  std::vector<Tensor*> GetInputs() const;
   virtual void RunImpl() = 0;
 
   virtual void Init() = 0;

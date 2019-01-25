@@ -51,7 +51,10 @@ class Executor {
 #ifdef PADDLE_MOBILE_FPGA
   void InjectVariable(const Tensor &t, std::string var_name);
   void FeedData(const Tensor &t);
-  std::shared_ptr<Tensor> FetchResult(int id = -1);
+  // std::shared_ptr<Tensor> FetchResult(int id = -1);
+  std::shared_ptr<Tensor> FetchResult(int id = -1, int index = 0);
+  int OpNum();
+  int OutputsNum(int id);
   void Predict_From_To(int start = 0, int end = -1);
   void Predict_From(int start);
   void Predict_To(int end);

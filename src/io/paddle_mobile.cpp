@@ -74,10 +74,13 @@ PMStatus PaddleMobile<Device, T>::Load(const std::string &model_path,
 }
 
 template <typename Device, typename T>
-bool PaddleMobile<Device, T>::LoadCombinedMemory(
-    size_t model_len, const uint8_t *model_buf, size_t combined_params_len,
-    uint8_t *combined_params_buf, bool optimize, bool quantification,
-    int batch_size, bool loddable) {
+bool PaddleMobile<Device, T>::LoadCombinedMemory(size_t model_len,
+                                                 const uint8_t *model_buf,
+                                                 size_t combined_params_len,
+                                                 uint8_t *combined_params_buf) {
+  int batch_size = 1;
+  bool optimise = true;
+  bool quantification = false;
   if (loader_.get() == nullptr) {
     loader_ = std::make_shared<framework::Loader<Device, T>>();
   } else {
@@ -86,9 +89,9 @@ bool PaddleMobile<Device, T>::LoadCombinedMemory(
   if (executor_.get() == nullptr) {
     executor_ = std::make_shared<framework::Executor<Device, T>>(
         loader_->LoadCombinedMemory(model_len, model_buf, combined_params_len,
-                                    combined_params_buf, optimize,
+                                    combined_params_buf, optimise,
                                     quantification),
-        batch_size, optimize, loddable);
+        batch_size, optimise);
   } else {
     LOG(kLOG_INFO) << "executor inited";
   }
@@ -212,8 +215,18 @@ void PaddleMobile<Device, T>::FeedData(const framework::Tensor &t) {
 
 template <typename Device, typename T>
 std::shared_ptr<framework::Tensor> PaddleMobile<Device, T>::FetchResult(
-    int id) {
-  return executor_->FetchResult(id);
+    int id,int index) {
+  return executor_->FetchResult(id,index);
+}
+
+template <typename Device, typename T>
+int PaddleMobile<Device, T>::OpNum() {
+  return executor_->OpNum();
+}
+
+template <typename Device, typename T>
+int PaddleMobile<Device, T>::OutputsNum(int id) {
+  return executor_->OutputsNum(id);
 }
 
 template <typename Device, typename T>

@@ -36,5 +36,8 @@ REGISTER_OPERATOR_CPU(shape, ops::ShapeOp);
 #endif
 #ifdef PADDLE_MOBILE_MALI_GPU
 #endif
+#ifdef PADDLE_MOBILE_FPGA
+REGISTER_OPERATOR_FPGA(shape, ops::ShapeOp);
+#endif
 
 #endif

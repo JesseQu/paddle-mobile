@@ -73,9 +73,7 @@ class PaddleMobile {
 
   bool LoadCombinedMemory(size_t model_len, const uint8_t *model_buf,
                           size_t combined_params_len,
-                          uint8_t *combined_params_buf, bool optimize = false,
-                          bool quantification = false, int batch_size = 1,
-                          bool loddable = false);
+                          uint8_t *combined_params_buf);
 
   void SetThreadNum(int count);
   void Clear();
@@ -84,7 +82,9 @@ class PaddleMobile {
 #ifdef PADDLE_MOBILE_FPGA
   void InjectVariable(const framework::Tensor &t, std::string var_name);
   void FeedData(const framework::Tensor &t);
-  std::shared_ptr<framework::Tensor> FetchResult(int id = -1);
+  std::shared_ptr<framework::Tensor> FetchResult(int id = -1,int index = 0);
+  int OpNum();
+  int OutputsNum(int id);
   void Predict_From_To(int start = 0, int end = -1);
   void Predict_From(int start);
   void Predict_To(int end);

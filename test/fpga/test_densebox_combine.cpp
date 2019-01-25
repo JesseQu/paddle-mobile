@@ -23,6 +23,11 @@ limitations under the License. */
 #include "fpga/V2/api.h"
 #endif
 
+#ifdef PADDLE_MOBILE_FPGA_KD
+#include "fpga-kd/api.h"
+#endif
+
+
 static const char *g_densebox_combine = "../models/densebox";
 int main() {
   paddle_mobile::fpga::open_device();

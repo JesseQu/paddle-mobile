@@ -52,6 +52,11 @@ class Tensor : public TensorBase {
     this->dims_ = inTensor.dims_;
     this->holder_ = inTensor.holder_;
     this->offset_ = inTensor.offset_;
+
+#ifdef PADDLE_MOBILE_FPGA
+    this->aligned_ = inTensor.aligned_;
+#endif
+
   }
 
   /*! Resize the dimensions of the memory block. */
@@ -66,6 +71,7 @@ class Tensor : public TensorBase {
     if (holder_.get() != src.holder_.get()) {
       *this = src;
     }
+    aligned_ = src.aligned_;
     return *this;
   }
 
@@ -169,7 +175,21 @@ class Tensor : public TensorBase {
         reinterpret_cast<uintptr_t>(holder_->ptr()) + offset_);
   }
 
+#ifdef PADDLE_MOBILE_FPGA
+  inline const bool data_aligned() const {
+    return aligned_;
+  }
+
+  inline void set_data_aligned(bool aligned) {
+    aligned_ = aligned;
+  }
+#endif
+
  private:
+#ifdef PADDLE_MOBILE_FPGA
+  bool aligned_ = true;
+#endif
+
   struct PlaceholderImpl : public Placeholder {
     PlaceholderImpl(size_t size, std::type_index type)
         : ptr_(static_cast<uint8_t *>(memory::Alloc(size)),
@@ -202,21 +222,6 @@ class Tensor : public TensorBase {
   inline void reset_data_ptr(void *p) {
     ((PlaceholderImpl *)(holder_.get()))->ptr_.reset((uint8_t *)p);  // NOLINT
   }
-
-  inline void *init(std::type_index type) {
-    if (holder_ != nullptr) {
-      holder_->set_type(type);
-    }
-    PADDLE_MOBILE_ENFORCE(numel() >= 0, "the Tensor's numel must >=0.")
-    int64_t size = 1 * SizeOfType(type);
-    if (holder_ == nullptr || holder_->size() < size + offset_) {
-      holder_.reset(new PlaceholderImpl(size, type));
-      offset_ = 0;
-    }
-    return reinterpret_cast<void *>(
-        reinterpret_cast<uintptr_t>(holder_->ptr()) + offset_);
-  }
-
   float scale[2];  // scale[0]= MAX/127.0, scale[1]= 127.0/MAX
 #endif
 };

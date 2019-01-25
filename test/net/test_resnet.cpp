@@ -18,6 +18,8 @@ limitations under the License. */
 
 int main() {
 #ifdef PADDLE_MOBILE_FPGA
+  paddle_mobile::fpga::open_device();
+
   paddle_mobile::PaddleMobile<paddle_mobile::FPGA> paddle_mobile;
 #endif
 
@@ -66,5 +68,8 @@ int main() {
               << std::endl;*/
 #endif
   }
+#ifdef PADDLE_MOBILE_FPGA
+  paddle_mobile::fpga::close_device();
+#endif
   return 0;
 }

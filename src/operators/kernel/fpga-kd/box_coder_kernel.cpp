@@ -1,0 +1,218 @@
+/* Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. */
+
+#ifdef BOXCODER_OP
+
+#include "operators/kernel/box_coder_kernel.h"
+// #include "operators/kernel/central-arm-func/box_coder_arm_func.h"
+
+namespace paddle_mobile {
+namespace operators {
+
+template <typename T>
+void EncodeCenterSize(const framework::Tensor& target_box,
+                      const framework::Tensor& prior_box,
+                      const framework::Tensor& prior_box_var, T* output) {
+  int64_t row = target_box.dims()[0];
+  int64_t col = prior_box.dims()[0];
+  int64_t len = prior_box.dims()[1];
+  auto* target_box_data_half = target_box.data<T>();
+  auto* prior_box_data_half = prior_box.data<T>();
+  auto* prior_box_var_data_half = prior_box_var.data<T>();
+
+  float* target_box_data = reinterpret_cast<float*>(
+      fpga::fpga_malloc(target_box.numel() * sizeof(float)));
+  float* prior_box_data = reinterpret_cast<float*>(
+      fpga::fpga_malloc(prior_box.numel() * sizeof(float)));
+  float* prior_box_var_data = reinterpret_cast<float*>(
+      fpga::fpga_malloc(prior_box_var.numel() * sizeof(float)));
+
+  fpga::to_float(const_cast<float*>(target_box_data_half),
+                 const_cast<float*>(target_box_data), target_box.numel());
+  fpga::to_float(const_cast<float*>(prior_box_data_half), prior_box_data,
+                 prior_box.numel());
+  fpga::to_float(const_cast<float*>(prior_box_var_data_half),
+                 prior_box_var_data, prior_box_var.numel());
+
+  for (int64_t i = 0; i < row; ++i) {
+    for (int64_t j = 0; j < col; ++j) {
+      T prior_box_width = prior_box_data[j * len + 2] - prior_box_data[j * len];
+      T prior_box_height =
+          prior_box_data[j * len + 3] - prior_box_data[j * len + 1];
+      T prior_box_center_x =
+          (prior_box_data[j * len + 2] + prior_box_data[j * len]) / 2;
+      T prior_box_center_y =
+          (prior_box_data[j * len + 3] + prior_box_data[j * len + 1]) / 2;
+
+      T target_box_center_x =
+          (target_box_data[i * len + 2] + target_box_data[i * len]) / 2;
+      T target_box_center_y =
+          (target_box_data[i * len + 3] + target_box_data[i * len + 1]) / 2;
+      T target_box_width =
+          target_box_data[i * len + 2] - target_box_data[i * len];
+      T target_box_height =
+          target_box_data[i * len + 3] - target_box_data[i * len + 1];
+
+      size_t offset = i * col * len + j * len;
+      output[offset] = (target_box_center_x - prior_box_center_x) /
+                       prior_box_width / prior_box_var_data[j * len];
+      output[offset + 1] = (target_box_center_y - prior_box_center_y) /
+                           prior_box_height / prior_box_var_data[j * len + 1];
+      output[offset + 2] =
+          std::log(std::fabs(target_box_width / prior_box_width)) /
+          prior_box_var_data[j * len + 2];
+      output[offset + 3] =
+          std::log(std::fabs(target_box_height / prior_box_height)) /
+          prior_box_var_data[j * len + 3];
+    }
+  }
+  fpga::fpga_free(target_box_data);
+  fpga::fpga_free(prior_box_data);
+  fpga::fpga_free(prior_box_var_data);
+}
+
+template <typename T>
+void DecodeCenterSize(const framework::Tensor& target_box,
+                      const framework::Tensor& prior_box,
+                      const framework::Tensor& prior_box_var, T* output) {
+
+
+
+  int64_t row = target_box.dims()[0];
+  int64_t col = prior_box.dims()[0];
+  int64_t len = prior_box.dims()[1];
+  auto* target_box_data_half = target_box.data<T>();
+  auto* prior_box_data_half = prior_box.data<T>();
+  auto* prior_box_var_data_half = prior_box_var.data<T>();
+
+  float* target_box_data = reinterpret_cast<float*>(
+      fpga::fpga_malloc(target_box.numel() * sizeof(float)));
+  float* prior_box_data = reinterpret_cast<float*>(
+      fpga::fpga_malloc(prior_box.numel() * sizeof(float)));
+  float* prior_box_var_data = reinterpret_cast<float*>(
+      fpga::fpga_malloc(prior_box_var.numel() * sizeof(float)));
+
+  fpga::fpga_flush(const_cast<float*>(target_box_data_half), target_box.numel() * sizeof(half));
+  fpga::fpga_flush(const_cast<float*>(prior_box_data_half), prior_box.numel() * sizeof(half));
+  fpga::fpga_flush(const_cast<float*>(prior_box_var_data_half), prior_box_var.numel() * sizeof(half));
+
+  fpga::to_float(const_cast<float*>(target_box_data_half),
+                 const_cast<float*>(target_box_data), target_box.numel());
+  fpga::to_float(const_cast<float*>(prior_box_data_half), prior_box_data,
+                 prior_box.numel());
+  fpga::to_float(const_cast<float*>(prior_box_var_data_half),
+                 prior_box_var_data, prior_box_var.numel());
+
+  for (int64_t i = 0; i < row; ++i) {
+    for (int64_t j = 0; j < col; ++j) {
+      size_t offset = i * col * len + j * len;
+      T prior_box_width = prior_box_data[j * len + 2] - prior_box_data[j * len];
+      T prior_box_height =
+          prior_box_data[j * len + 3] - prior_box_data[j * len + 1];
+      T prior_box_center_x =
+          (prior_box_data[j * len + 2] + prior_box_data[j * len]) / 2;
+      T prior_box_center_y =
+          (prior_box_data[j * len + 3] + prior_box_data[j * len + 1]) / 2;
+
+      T target_box_center_x = prior_box_var_data[j * len] *
+                                  target_box_data[offset] * prior_box_width +
+                              prior_box_center_x;
+      T target_box_center_y = prior_box_var_data[j * len + 1] *
+                                  target_box_data[offset + 1] *
+                                  prior_box_height +
+                              prior_box_center_y;
+      T target_box_width = std::exp(prior_box_var_data[j * len + 2] *
+                                    target_box_data[offset + 2]) *
+                           prior_box_width;
+      T target_box_height = std::exp(prior_box_var_data[j * len + 3] *
+                                     target_box_data[offset + 3]) *
+                            prior_box_height;
+
+      output[offset] = target_box_center_x - target_box_width / 2;
+      output[offset + 1] = target_box_center_y - target_box_height / 2;
+      output[offset + 2] = target_box_center_x + target_box_width / 2;
+      output[offset + 3] = target_box_center_y + target_box_height / 2;
+    }
+  }
+  fpga::fpga_free(target_box_data);
+  fpga::fpga_free(prior_box_data);
+  fpga::fpga_free(prior_box_var_data);
+}
+
+template <typename P>
+void BoxCoderCompute(const BoxCoderParam<FPGA>& param) {
+  const auto* input_priorbox = param.InputPriorBox();
+  const auto* input_priorboxvar = param.InputPriorBoxVar();
+  const auto* input_targetbox = param.InputTargetBox();
+
+  const auto& code_type = param.CodeType();
+
+  auto row = input_targetbox->dims()[0];
+  auto col = input_priorbox->dims()[0];
+  auto len = input_priorbox->dims()[1];
+
+  framework::Tensor* output_box = param.OutputBox();
+  auto* output_box_dataptr = output_box->mutable_data<float>({row, col, len});
+
+  if (code_type == "encode_center_size") {
+    EncodeCenterSize<float>(*input_targetbox, *input_priorbox,
+                            *input_priorboxvar, output_box_dataptr);
+  }
+  if (code_type == "decode_center_size") {
+    DecodeCenterSize<float>(*input_targetbox, *input_priorbox,
+                            *input_priorboxvar, output_box_dataptr);
+  }
+  fpga::fpga_flush(output_box_dataptr, output_box->numel() * sizeof(float));
+}
+
+template <>
+bool BoxCoderKernel<FPGA, float>::Init(BoxCoderParam<FPGA>* param) {
+  framework::Tensor* out = param->OutputBox();
+  out->set_data_aligned(false);
+  return true;
+}
+
+template <>
+void BoxCoderKernel<FPGA, float>::Compute(const BoxCoderParam<FPGA>& param) {
+  BoxCoderCompute<float>(param);
+
+  framework::Tensor* out = param.OutputBox();
+  auto* output_box_dataptr = out->data<float>();
+  
+
+  // TODO to fp16;
+
+
+  // std::string box_file = "boxcoder.txt";
+
+  // std::ofstream outf(box_file.c_str());
+  // int16_t* half_data = (int16_t*)output_box_dataptr;
+  // int len = out->numel();
+
+  // for (int i = 0; i < len; i++) {
+  //   // float result = paddle_mobile::fpga::fp16_2_fp32(half_data[i]);
+  //   float result = output_box_dataptr[i];
+  //   outf << result << std::endl;
+  // }
+  // outf.close();
+
+
+
+  // exit(-1);
+}
+
+}  // namespace operators
+}  // namespace paddle_mobile
+
+#endif

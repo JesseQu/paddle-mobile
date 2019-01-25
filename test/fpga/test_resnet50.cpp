@@ -23,6 +23,11 @@ limitations under the License. */
 #include "fpga/V2/api.h"
 #endif
 
+#ifdef PADDLE_MOBILE_FPGA_KD
+#include "fpga-kd/api.h"
+#endif
+
+
 void readStream(std::string filename, float *buf) {
   std::ifstream in;
   in.open(filename, std::ios::in);
@@ -83,16 +88,16 @@ void dump_stride(std::string filename, const Tensor input_tensor,
   free(data_tmp);
 }
 static const char *g_resnet50 = "../models/resnet50";
-const std::string g_image_src_float = "../images/image_src_float";
+//const std::string g_image_src_float = "../images/image_src_float";
 int main() {
   paddle_mobile::fpga::open_device();
   paddle_mobile::PaddleMobile<paddle_mobile::FPGA> paddle_mobile;
-  if (paddle_mobile.Load(std::string(g_resnet50), true)) {
+  if (paddle_mobile.Load(std::string(g_resnet50), false)) {
     Tensor input_tensor;
-    SetupTensor<float>(&input_tensor, {1, 3, 224, 224}, static_cast<float>(2),
-                       static_cast<float>(2));
-    readStream(g_image_src_float,
-               input_tensor.mutable_data<float>({1, 3, 224, 224}));
+    SetupTensor<float>(&input_tensor, {1, 3, 224, 224}, static_cast<float>(1),
+                       static_cast<float>(1));
+//    readStream(g_image_src_float,
+//               input_tensor.mutable_data<float>({1, 3, 224, 224}));
     paddle_mobile.FeedData(input_tensor);
     paddle_mobile.Predict_To(-1);
     for (int i = 0; i < 73; i++) {
@@ -126,4 +131,5 @@ int main() {
     std::cout << "Computation done" << std::endl;
     return 0;
   }
+  paddle_mobile::fpga::close_device();
 }

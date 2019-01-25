@@ -39,6 +39,24 @@ vector<string> OperatorBase<Dtype>::GetInputKeys() const {
 }
 
 template <typename Dtype>
+vector<Tensor*> OperatorBase<Dtype>::GetInputs() const {
+  std::vector<Tensor*> vector;
+  std::vector<string> input_keys = GetInputKeys();
+  for (const auto key : input_keys) {
+    auto var_vec_in = inputs_.at(key);
+    for (int i = 0; i < var_vec_in.size(); ++i) {
+      auto vari = scope_->FindVar(var_vec_in[i]);
+      if (vari->IsInitialized()) {
+        Tensor *tensor = vari->template GetMutable<framework::LoDTensor>();
+        // if (tensor) DLOG << type_ << " input- " << key << "=" << *tensor;
+        vector.push_back(tensor);
+      }
+    }
+  }
+  return vector;
+}
+
+template <typename Dtype>
 OperatorBase<Dtype>::OperatorBase(const std::string &type,
                                   const VariableNameMap &inputs,
                                   const VariableNameMap &outputs,
@@ -55,11 +73,12 @@ OperatorBase<Dtype>::OperatorBase(const std::string &type,
 template <typename Dtype>
 void OperatorBase<Dtype>::CheckAllInputOutputSet() const {}
 
+
 template <typename Dtype>
 void OperatorBase<Dtype>::Run() {
   RunImpl();
 #ifdef PADDLE_MOBILE_DEBUG
-  DLOG << "-------------" << type_ << "----------------------------";
+  // DLOG << "-------------" << type_ << "----------------------------";
   vector<string> input_keys = GetInputKeys();
   for (const auto key : input_keys) {
     auto var_vec_in = inputs_.at(key);
@@ -67,7 +86,7 @@ void OperatorBase<Dtype>::Run() {
       auto vari = scope_->FindVar(var_vec_in[i]);
       if (vari->IsInitialized()) {
         Tensor *tensor = vari->template GetMutable<framework::LoDTensor>();
-        if (tensor) DLOG << type_ << " input- " << key << "=" << *tensor;
+        // if (tensor) DLOG << type_ << " input- " << key << "=" << *tensor;
       }
     }
   }
@@ -77,7 +96,7 @@ void OperatorBase<Dtype>::Run() {
       auto vari = scope_->FindVar(var_vec_out[i]);
       if (vari->IsInitialized()) {
         Tensor *tensor = vari->template GetMutable<framework::LoDTensor>();
-        if (tensor) DLOG << type_ << " output- " << key << "=" << *tensor;
+        // if (tensor) DLOG << type_ << " output- " << key << "=" << *tensor;
       }
     }
   }

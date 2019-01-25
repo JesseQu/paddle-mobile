@@ -32,10 +32,30 @@ limitations under the License. */
 #include "framework/cl/cl_image.h"
 #endif
 
+#include "fpga-kd/api.h"
+
 namespace paddle_mobile {
 namespace framework {
 
 #pragma mark - executor
+
+void readStream(std::string filename, float *buf) {
+  std::ifstream in;
+  in.open(filename, std::ios::in);
+  if (!in.is_open()) {
+    std::cout << "open File Failed." << std::endl;
+    return;
+  }
+  string strOne;
+  int i = 0;
+  std::cout << "=======================\n";
+  while (!in.eof()) {
+    in >> buf[i];
+    // std::cout << buf[i] << " , ";
+    i++;
+  }
+  in.close();
+}
 
 template <typename Device, typename T>
 Executor<Device, T>::Executor(const Program<Device> &program, int batch_size,
@@ -230,10 +250,6 @@ template <typename Device, typename T>
 bool Executor<Device, T>::varInputMemory(
     const std::shared_ptr<VarDesc> &var_desc, Variable *var,
     LoDTensor *tensor) const {
-#ifdef PADDLE_MOBILE_FPGA
-  tensor->init(typeid(float));
-  return true;
-#endif
   auto type = var_desc->Tensor_desc().DataType();
   switch (type) {
     case VARTYPE_TYPE_FP32:
@@ -402,7 +418,23 @@ void Executor<Device, T>::FeedData(const Tensor &t) {
 }
 
 template <typename Device, typename T>
-std::shared_ptr<Tensor> Executor<Device, T>::FetchResult(int id) {
+int Executor<Device, T>::OpNum() {
+  auto &ops = ops_of_block_[0];
+  return (int)ops.size();
+}
+
+template <typename Device, typename T>
+int Executor<Device, T>::OutputsNum(int id) {
+  auto &ops = ops_of_block_[0];
+
+  PADDLE_MOBILE_ENFORCE(id < (int)ops.size(), "Index out of range");
+  auto op = id < 0 ? ops[ops.size() - 1] : ops[id];
+  std::vector<std::string> out_keys = op->GetOutKeys();
+  return out_keys.size();
+}
+
+template <typename Device, typename T>
+std::shared_ptr<Tensor> Executor<Device, T>::FetchResult(int id, int index) {
   auto &ops = ops_of_block_[0];
 
   PADDLE_MOBILE_ENFORCE(id < (int)ops.size(), "Index out of range");
@@ -411,7 +443,7 @@ std::shared_ptr<Tensor> Executor<Device, T>::FetchResult(int id) {
   std::vector<std::string> out_keys = op->GetOutKeys();
   PADDLE_MOBILE_ENFORCE(!out_keys.empty(), "this op contains no output");
   auto *output_tensor =
-      GetVarValue<LoDTensor>(out_keys[0], output_map, *(program_.scope));
+      GetVarValue<LoDTensor>(out_keys[index], output_map, *(program_.scope));
   return std::make_shared<Tensor>(Tensor(*output_tensor));
 }
 
@@ -432,6 +464,40 @@ void Executor<Device, T>::Predict_From_To(int start, int end) {
     profile[i].runBegin = (uint64_t)ts.tv_sec * 1e9 + ts.tv_nsec;
 #endif
     DLOG << "Running op: " << i << "  " << ops[i]->Type();
+
+    // auto inputs = ops[i]->Inputs();
+    // std::vector<string> keys = ops[i]->GetInputKeys();
+
+    std::vector<Tensor*> inputs = ops[i]->GetInputs();
+
+    for (int n = 0; n < inputs.size(); n++) {
+      auto input = inputs[n];
+      DLOG << "input:" << n << " aligned: " << input->data_aligned();
+    }
+
+    for (int n = 0; n < inputs.size(); n++) {
+      std::string file_name = "input/" + std::to_string(i) + 
+      "_" + std::to_string(n) + ".txt";
+      std::ifstream infile(file_name);
+      if (infile.good()) {
+        DLOG << "Input exist::" << file_name;
+        auto input = inputs[n];
+
+
+        auto data_ptr = input->data<float>();
+        int16_t* half_ptr = (int16_t*)data_ptr;
+        DLOG << "data::" << input;
+        float* data = (float*)fpga::fpga_malloc(input->numel() * 4);
+        readStream(file_name, data);
+        for (int j = 0; j < input->numel(); j++) {
+          int16_t half_data = fpga::fp32_2_fp16(data[i]);
+          half_ptr[i] = half_data;
+        }
+        fpga::fpga_flush(data_ptr, input->numel() * 2);
+        fpga::fpga_free(data);
+      }
+    }
+
     ops[i]->Run();
 
 #ifdef PADDLE_MOBILE_PROFILE

@@ -62,6 +62,20 @@ if (CON GREATER -1)
 
 endif ()
 
+list(FIND NET "FPGA_NET_KD" CON)
+if (CON GREATER -1)
+    ADD_EXECUTABLE(test-ssd net/test_ssd.cpp test_helper.h test_include.h executor_for_test.h )
+    target_link_libraries(test-ssd paddle-mobile)
+
+    ADD_EXECUTABLE(test-resnet50 fpga/test_resnet50.cpp test_helper.h test_include.h executor_for_test.h)
+    target_link_libraries(test-resnet50 paddle-mobile)
+
+    ADD_EXECUTABLE(test-resnet net/test_resnet.cpp test_helper.h test_include.h executor_for_test.h)
+    target_link_libraries(test-resnet paddle-mobile)
+
+    set(FOUND_MATCH ON)
+endif ()
+
 list(FIND NET "FPGA_NET_V1" CON)
 if (CON GREATER -1)
     ADD_EXECUTABLE(test-resnet50 fpga/test_resnet50.cpp test_helper.h test_include.h executor_for_test.h)
@@ -125,15 +139,6 @@ if (CON GREATER -1)
     # gen test
     ADD_EXECUTABLE(test-genet net/test_genet_combine.cpp test_helper.h test_include.h executor_for_test.h)
     target_link_libraries(test-genet paddle-mobile)
-    set(FOUND_MATCH ON)
-
-endif ()
-
-list(FIND NET "super" CON)
-if (CON GREATER -1)
-    # gen test
-    ADD_EXECUTABLE(test-super net/test_super.cpp test_helper.h test_include.h executor_for_test.h)
-    target_link_libraries(test-super paddle-mobile)
     set(FOUND_MATCH ON)
 
 endif ()
@@ -381,8 +386,9 @@ if (NOT FOUND_MATCH)
     # gen test
     ADD_EXECUTABLE(test-super net/test_super.cpp test_helper.h test_include.h)
     target_link_libraries(test-super paddle-mobile)
-   
+
     # gen test
-    ADD_EXECUTABLE(test-ocr net/test_ocr.cpp test_helper.h test_include.h)
-    target_link_libraries(test-ocr paddle-mobile)
+    # ADD_EXECUTABLE(test-ocr net/test_ocr.cpp test_helper.h test_include.h)
+    # target_link_libraries(test-ocr paddle-mobile)
+
 endif ()

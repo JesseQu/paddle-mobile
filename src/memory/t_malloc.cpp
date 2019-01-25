@@ -24,6 +24,10 @@ limitations under the License. */
 #include "fpga/V2/api.h"
 #endif
 
+#ifdef PADDLE_MOBILE_FPGA_KD
+#include "fpga-kd/api.h"
+#endif
+
 namespace paddle_mobile {
 namespace memory {
 const int MALLOC_ALIGN = 64;
